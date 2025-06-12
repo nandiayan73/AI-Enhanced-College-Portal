@@ -87,7 +87,16 @@ const subjectSchema = new mongoose.Schema({
     match: /^[0-9]{4}-[0-9]{2}$/, // e.g., 2021-22
     unique: true,
   },
+
   posts: [postSchema],
+  syllabus:{
+    url:{type:String},
+    text:{type:String}
+  },
+  questionPapers:[{
+    url:{type:String},
+    text:{type:String}
+  }]
 });
 
 module.exports = mongoose.model("Subject", subjectSchema);

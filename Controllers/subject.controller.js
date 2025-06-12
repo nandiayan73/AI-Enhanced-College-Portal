@@ -2,8 +2,7 @@ const Subject = require("../models/subject.model");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const AcademicYear = require("../models/academicyear.model");
 const Student = require("../models/student.model");
-const genAI = new  GoogleGenerativeAI("AIzaSyBZdtCA6YrZjBSr2igkeMn3a9xn21CsntY");
-
+const genAI = new  GoogleGenerativeAI("AIzaSyCM48oPGZCBbe0fNiHLWhEC5AtGlMVowPc");
 const createSubject = async (req, res) => {
   try {
     const {
@@ -156,7 +155,6 @@ const markAttendance = async (req, res) => {
   }
 };
 
-
 const markPresent = async (req, res) => {
   const { subjectId, date, imageUrl } = req.body;
 
@@ -167,10 +165,8 @@ const markPresent = async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-pro' });
 
-    // 🔍 Fetch the image
     const imageResp = await fetch(imageUrl).then((res) => res.arrayBuffer());
 
-    // 🧠 Ask Gemini to extract names from image
     const result = await model.generateContent([
       {
         inlineData: {
@@ -178,64 +174,193 @@ const markPresent = async (req, res) => {
           mimeType: "image/jpeg",
         },
       },
-      `This image contains the handwritten or printed names of students who are present today. Extract only the **full names** in order (one per line, no commas or extra formatting). Do not generate names, extract exactly what you see.`,
+      `This image contains the handwritten or printed names of students who are present today. Extract only the full names in order (one per line, no commas or extra formatting). Do not generate names, extract exactly what you see.`,
     ]);
 
     const text = result.response.text();
-    const extractedNames = text
+    const presentStudentNames = text
       .split("\n")
       .map(name => name.trim())
       .filter(name => name.length > 0);
 
-    console.log("Extracted Names:", extractedNames);
+    console.log("✅ Extracted Present Names:", presentStudentNames);
 
-    // Load subject and students
-    const subject = await Subject.findById(subjectId).populate("students.student");
-    if (!subject) return res.status(404).json({ message: "Subject not found." });
-
-    const attendanceDate = new Date(date);
-
-    // 🔁 Update attendance
-    subject.students.forEach((entry) => {
-      const studentName = entry.student.name;
-      const isPresent = extractedNames.includes(studentName);
-
-      const alreadyMarked = entry.attendanceRecords.find(
-        (record) => new Date(record.date).toDateString() === attendanceDate.toDateString()
-      );
-
-      if (!alreadyMarked) {
-        entry.attendanceRecords.push({
-          date: attendanceDate,
-          present: isPresent,
-        });
+    // ⏬ Call markAttendance by passing new req and res objects
+    const newReq = {
+      body: {
+        subjectId,
+        date,
+        presentStudentNames
       }
-    });
+    };
 
-    // 🧮 Recalculate total percentage for each student
-    subject.students.forEach((entry) => {
-      const totalRecords = entry.attendanceRecords.length;
-      const totalPresent = entry.attendanceRecords.filter(r => r.present).length;
-
-      const percentage = totalRecords > 0
-        ? (totalPresent / totalRecords) * 100
-        : 0;
-
-      entry.totalPercentage = Number(percentage.toFixed(2)); // rounded to 2 decimal places
-    });
-
-    await subject.save();
-
-    res.status(200).json({
-      message: "Attendance successfully marked based on image.",
-      present: extractedNames,
-    });
+    // Wrap res to capture the output or just forward the final response
+    await markAttendance(newReq, res);
 
   } catch (err) {
-    console.error("Error marking attendance via image:", err);
-    res.status(500).json({ message: "Failed to process attendance." });
+    console.error("Error in markPresent:", err);
+    return res.status(500).json({ message: "Failed to mark attendance from image." });
+  }
+};
+const createPost = async (req, res) => {
+  try {
+    const { subjectId, type, contentUrl, captionText } = req.body;
+
+    const user = req.rootUser; // From auth middleware
+    const role = user.role;    // Should be "HOD" or "Faculty"
+
+    if (!subjectId || !type) {
+      return res.status(400).json({ message: "Subject ID and post type are required." });
+    }
+
+    // Validate post content based on type
+    if (type === "caption" && !captionText) {
+      return res.status(400).json({ message: "Caption text is required for caption posts." });
+    }
+
+    if (type !== "caption" && !contentUrl) {
+      return res.status(400).json({ message: "Content URL is required for this type of post." });
+    }
+
+    // Find subject
+    const subject = await Subject.findById(subjectId);
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found." });
+    }
+
+    // Optional: Check if user is authorized to post on this subject
+    const isHOD = role === "HOD";
+    const isFaculty = role === "Faculty" && subject.faculty.includes(user._id.toString());
+
+    if (!isHOD && !isFaculty) {
+      return res.status(403).json({ message: "Only assigned faculty or HOD can post." });
+    }
+
+    // Create post object
+    const newPost = {
+      type,
+      createdAt: new Date(),
+      role,
+      postedBy: user._id,
+    };
+
+    if (type === "caption") {
+      newPost.captionText = captionText;
+    } else {
+      newPost.contentUrl = contentUrl;
+    }
+
+    // Push to subject
+    subject.posts.unshift(newPost); // Add at beginning
+    await subject.save();
+
+    res.status(201).json({ message: "Post added successfully.", post: newPost });
+
+  } catch (error) {
+    console.error("Error in createPost:", error);
+    res.status(500).json({ message: "Failed to create post." });
   }
 };
 
 
-module.exports={createSubject, markAttendance,markPresent};
+const uploadSyllabus = async (req, res) => {
+  const { subjectId, syllabusUrl } = req.body;
+
+  if (!subjectId || !syllabusUrl) {
+    return res.status(400).json({ message: "Subject ID and syllabus URL are required." });
+  }
+
+  try {
+    const subject = await Subject.findById(subjectId);
+    if (!subject) return res.status(404).json({ message: "Subject not found." });
+
+    // 📷 Fetch image and convert to base64
+    const imageResp = await fetch(syllabusUrl).then(res => res.arrayBuffer());
+
+    // const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-pro' });
+    const model=genAI.getGenerativeModel({ model: 'models/gemini-1.5-flash' })
+
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: Buffer.from(imageResp).toString("base64"),
+          mimeType: "image/jpeg",
+        },
+      },
+      "Extract all the text content from this syllabus image clearly, maintain module-wise structure if available."
+    ]);
+
+    const extractedText = result.response.text();
+
+    // 💾 Save to subject
+    subject.syllabus = {
+      url: syllabusUrl,
+      text: extractedText,
+    };
+
+    await subject.save();
+
+    return res.status(200).json({
+      message: "Syllabus uploaded and processed successfully.",
+      syllabus: subject.syllabus,
+    });
+
+  } catch (err) {
+    console.error("Syllabus Upload Error:", err);
+    return res.status(500).json({ message: "Server error while uploading syllabus." });
+  }
+};
+
+const addQuestionPaper = async (req, res) => {
+  const { subjectId, questionPaperUrl } = req.body;
+
+  if (!subjectId || !questionPaperUrl) {
+    return res.status(400).json({ message: "Subject ID and question paper URL are required." });
+  }
+
+  try {
+    const subject = await Subject.findById(subjectId);
+    if (!subject) return res.status(404).json({ message: "Subject not found." });
+
+    // 📷 Fetch image and convert to base64
+    const imageResp = await fetch(questionPaperUrl).then(res => res.arrayBuffer());
+
+    // const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-pro' });
+    const model=genAI.getGenerativeModel({ model: 'models/gemini-1.5-flash' })
+
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: Buffer.from(imageResp).toString("base64"),
+          mimeType: "image/jpeg",
+        },
+      },
+      "Extract all questions from this question paper. Include question numbers, sections, and marks if mentioned."
+    ]);
+
+    const extractedText = result.response.text();
+
+    // 💾 Add to question papers
+    subject.questionPapers.push({
+      url: questionPaperUrl,
+      text: extractedText,
+    });
+
+    await subject.save();
+
+    return res.status(200).json({
+      message: "Question paper uploaded and processed successfully.",
+      questionPapers: subject.questionPapers,
+    });
+
+  } catch (err) {
+    console.error("Add Question Paper Error:", err);
+    return res.status(500).json({ message: "Server error while adding question paper." });
+  }
+};
+
+
+
+module.exports={createSubject, markAttendance,markPresent,createPost,uploadSyllabus,addQuestionPaper};

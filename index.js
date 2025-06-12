@@ -14,7 +14,8 @@ const {registerUser} =require("./Controllers/authControllers");
 const { createAcademicYear } = require("./Controllers/academicyear.controller");
 const { createDepartment } = require("./Controllers/deparment.controllers");
 const { approveHOD, approveStudent } = require("./Controllers/approvalControllers");
-const { createSubject, markAttendance } = require("./Controllers/subject.controller");
+const { createSubject, markAttendance, createPost, uploadSyllabus, addQuestionPaper } = require("./Controllers/subject.controller");
+const { predictQuestions } = require("./Controllers/paper.controller");
 
 // Setting the database:
 db();
@@ -48,6 +49,14 @@ app.post("/user/approvestudent",approveStudent);
 // created subject by HODs:
 app.post("/subjects/createsubjects",createSubject);
 app.post("/subjects/markattendance",markAttendance);
+app.post("/subjects/post",createPost);
+
+// add syllabus and questions papers:
+app.post("/paper/addsyllabus",uploadSyllabus);
+app.post("/paper/addquestionpapers",addQuestionPaper);
+
+// paper analysis and prediction:
+app.post("/paper/prediction",predictQuestions);
 
 app.listen(3000,(req,res)=>{
     console.log("Server is set at port number\t"+port);
