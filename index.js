@@ -10,12 +10,13 @@ require('dotenv').config();
 const port = process.env.PORT;
 
 // importing the files:
-const {registerUser} =require("./Controllers/authControllers");
+const {registerUser, loginUser, isLogged} =require("./Controllers/authControllers");
 const { createAcademicYear } = require("./Controllers/academicyear.controller");
 const { createDepartment } = require("./Controllers/deparment.controllers");
 const { approveHOD, approveStudent } = require("./Controllers/approvalControllers");
 const { createSubject, markAttendance, createPost, uploadSyllabus, addQuestionPaper } = require("./Controllers/subject.controller");
 const { predictQuestions } = require("./Controllers/paper.controller");
+const Authenticate = require("./Middlewares/auth");
 
 // Setting the database:
 db();
@@ -34,8 +35,12 @@ app.use(cors({
 
 
 // API REQUESTS:
-// register user
+// register user:
 app.post("/user/register",registerUser);
+
+//login user:
+app.post("/user/login",loginUser);
+app.get("/user/auth",Authenticate,isLogged);
 
 // Approvals:
 app.post("/user/approveHOD",approveHOD);

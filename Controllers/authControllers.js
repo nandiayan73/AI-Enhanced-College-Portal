@@ -147,7 +147,8 @@ const loginUser = async (req, res) => {
         return res.status(403).json({ message: `Your ${user.role} account is not yet approved.` });
       }
     }
-
+    user.role=user.__t;
+    console.log(user.role);
     // 4. Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
