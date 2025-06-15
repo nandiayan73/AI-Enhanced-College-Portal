@@ -47,4 +47,30 @@ const createAcademicYear = async (req, res) => {
   }
 };
 
-module.exports = { createAcademicYear };
+
+const getAcademicYearsBySession = async (req, res) => {
+  const { session } = req.query;
+
+  try {
+    // Validate session format
+    const sessionRegex = /^[0-9]{4}-[0-9]{2}$/;
+    if (!session || !sessionRegex.test(session)) {
+      return res.status(400).json({ message: "Invalid or missing session. Format: YYYY-YY (e.g., 2025-26)" });
+    }
+
+    const years = await AcademicYear.find({ session }).sort({ year: 1 });
+
+    if (years.length === 0) {
+      return res.status(404).json({ message: `No academic years found for session ${session}` });
+    }
+
+    res.status(200).json(years);
+  } catch (err) {
+    console.error("Error fetching academic years:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+
+  
+module.exports = { createAcademicYear,getAcademicYearsBySession, };

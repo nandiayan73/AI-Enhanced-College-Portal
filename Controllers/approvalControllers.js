@@ -66,12 +66,14 @@ const approveStudent = async (req, res) => {
 
 const getPendingStudentsForHOD = async (req, res) => {
   try {
-    const hodId = req.userId; // Assuming userId is set by middleware (e.g. JWT middleware)
+    const hodId = req.body.hodId; // Assuming userId is set by middleware (e.g. JWT middleware)
 
     // 1. Find HOD to get department
     const hod = await HOD.findById(hodId);
+    console.log(hod);
     if (!hod) return res.status(404).json({ message: "HOD not found" });
 
+    // console.log(hod);
     // 2. Find students in the same department who are not approved
     const pendingStudents = await Student.find({
       department: hod.department,
@@ -92,8 +94,6 @@ const getPendingStudentsForHOD = async (req, res) => {
 
 const getUnapprovedHODs = async (req, res) => {
   try {
-    // This assumes req.userId is the Principal's ID (set by JWT middleware)
-    const principalId = req.userId;
 
     // Fetch all HODs not yet approved
     const pendingHODs = await HOD.find({ isApproved: false });

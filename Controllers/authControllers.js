@@ -192,8 +192,10 @@ const loginUser = async (req, res) => {
 const isLogged=async(req,res)=>{
     try
     {
+      console.log(req.rootUser);
         if(req.rootUser)
         {
+          console.log(req.rootUser);
             res.status(201);
             res.send(req.rootUser);
         }
@@ -210,7 +212,7 @@ const isLogged=async(req,res)=>{
 }
 const logout = (req, res) => {
     try {
-      res.clearCookie(cookieSecret);
+      res.clearCookie('HareKrishna');
       
       res.status(200).json({
         success: true,

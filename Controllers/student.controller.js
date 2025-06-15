@@ -1,0 +1,54 @@
+const BaseUser = require("../models/BaseUser.model");
+const Principal=require("../models/principal.model");
+const Student=require("../models/student.model");
+const Faculty=require("../models/faculty.model");
+const HOD=require("../models/hod.model");
+const AcademicYear = require("../models/academicYear.model"); // Make sure it's imported at the top
+const Subject = require("../models/subject.model");
+
+
+
+const getAcademicYearId=async(req,res)=>{
+     const academicYear = await AcademicYear.findOne({ session, year });
+        if (!academicYear) {
+          return res.status(404).json({
+                message: `Academic year not found for session "${session}" and year "${year}".`
+              });
+            }
+        return res.status(400).json({ academicYear});
+}
+
+
+const getStudentSubjects = async (req, res) => {
+  const {studentId}= req.body; // e.g., /student/subjects/:id
+
+  try {
+    // Fetch the student with academic year
+    const student = await Student.findById(studentId).populate("academicYear");
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const department = student.department;
+    const academicYearId = student.academicYear._id;
+
+    // Find subjects the student is enrolled in
+    const subjects = await Subject.find({
+      department: department,
+      academicYear: academicYearId,
+      "students.student": studentId
+    });
+
+    res.status(200).json({
+      department: department,
+      academicYear: student.academicYear,
+      subjects: subjects
+    });
+  } catch (err) {
+    console.error("Error fetching student subjects:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+module.exports = { getStudentSubjects };

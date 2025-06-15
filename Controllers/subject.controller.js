@@ -83,6 +83,7 @@ const createSubject = async (req, res) => {
 const markAttendance = async (req, res) => {
   try {
     const { subjectId, date, presentStudentNames } = req.body;
+    console.log("✅ Extracted Present Names:", presentStudentNames);
 
     if (!subjectId || !date || !Array.isArray(presentStudentNames)) {
       return res.status(400).json({ message: "All fields are required." });
@@ -99,61 +100,74 @@ const markAttendance = async (req, res) => {
     // 🔍 Get department and academicYear from subject
     const { department, academicYear } = subject;
 
-    // 🔁 Recheck for eligible students in that department & year
+    // 🔁 Get eligible students
     const eligibleStudents = await Student.find({
       department,
       academicYear,
-      isApproved: true
+      isApproved: true,
     });
 
-    // ✅ Add missing eligible students into subject.students
+    // ✅ Add missing students to subject
     eligibleStudents.forEach((student) => {
-      const alreadyEnrolled = subject.students.some((s) =>
-        s.student._id.toString() === student._id.toString()
+      const alreadyEnrolled = subject.students.some(
+        (s) => s.student._id.toString() === student._id.toString()
       );
 
       if (!alreadyEnrolled) {
         subject.students.push({
           student: student._id,
           attendanceRecords: [],
-          totalPercentage: 0
+          totalPercentage: 0,
         });
       }
     });
 
-    // Mark attendance
-    subject.students.forEach((entry) => {
-      const studentName = entry.student.name;
-      const isPresent = presentStudentNames.includes(studentName);
+    // ⚙️ Normalize helper
+    const normalizeName = (name) =>
+      name?.replace(/\s+/g, " ").trim().toLowerCase();
 
-      const alreadyMarked = entry.attendanceRecords.find(
-        (record) => new Date(record.date).toDateString() === attendanceDate.toDateString()
+    const normalizedPresentNames = presentStudentNames.map(normalizeName);
+
+    // ✅ Mark attendance
+    subject.students.forEach((entry) => {
+      const studentName = normalizeName(entry.student.name || "");
+      const isPresent = normalizedPresentNames.includes(studentName);
+
+      const existingRecord = entry.attendanceRecords.find(
+        (record) =>
+          new Date(record.date).toDateString() === attendanceDate.toDateString()
       );
 
-      if (!alreadyMarked) {
+      if (existingRecord) {
+        existingRecord.present = isPresent; // 🛠 Update if already marked
+      } else {
         entry.attendanceRecords.push({
           date: attendanceDate,
           present: isPresent,
         });
       }
+
+      console.log(`📌 ${entry.student.name}: ${isPresent ? "Present" : "Absent"}`);
     });
 
-    // ✅ Recalculate totalPercentage for each student
+    // ✅ Recalculate attendance percentages
     subject.students.forEach((entry) => {
       const totalDays = entry.attendanceRecords.length;
-      const presentDays = entry.attendanceRecords.filter(r => r.present).length;
+      const presentDays = entry.attendanceRecords.filter((r) => r.present).length;
       const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
-      entry.totalPercentage = Math.round(percentage * 100) / 100; // Round to 2 decimal places
+      entry.totalPercentage = Math.round(percentage * 100) / 100;
     });
 
     await subject.save();
-    return res.status(200).json({ message: "Attendance and percentages updated successfully." });
-
+    return res
+      .status(200)
+      .json({ message: "Attendance and percentages updated successfully." });
   } catch (error) {
     console.error("Attendance Error:", error);
     res.status(500).json({ message: "Server error while updating attendance." });
   }
 };
+
 
 const markPresent = async (req, res) => {
   const { subjectId, date, imageUrl } = req.body;
@@ -163,7 +177,7 @@ const markPresent = async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-pro' });
+    const model=genAI.getGenerativeModel({ model: 'models/gemini-1.5-flash' });
 
     const imageResp = await fetch(imageUrl).then((res) => res.arrayBuffer());
 
@@ -207,7 +221,8 @@ const createPost = async (req, res) => {
     const { subjectId, type, contentUrl, captionText } = req.body;
 
     const user = req.rootUser; // From auth middleware
-    const role = user.role;    // Should be "HOD" or "Faculty"
+    console.log(user);
+    const role = user.__t;    // Should be "HOD" or "Faculty"
 
     if (!subjectId || !type) {
       return res.status(400).json({ message: "Subject ID and post type are required." });
@@ -229,12 +244,12 @@ const createPost = async (req, res) => {
     }
 
     // Optional: Check if user is authorized to post on this subject
-    const isHOD = role === "HOD";
-    const isFaculty = role === "Faculty" && subject.faculty.includes(user._id.toString());
+    // const isHOD = role === "HOD";
+    // const isFaculty = role === "Faculty" && subject.faculty.includes(user._id.toString());
 
-    if (!isHOD && !isFaculty) {
-      return res.status(403).json({ message: "Only assigned faculty or HOD can post." });
-    }
+    // if (!isHOD && !isFaculty) {
+    //   return res.status(403).json({ message: "Only assigned faculty or HOD can post." });
+    // }
 
     // Create post object
     const newPost = {
@@ -245,10 +260,9 @@ const createPost = async (req, res) => {
     };
 
     if (type === "caption") {
-      newPost.captionText = captionText;
-    } else {
       newPost.contentUrl = contentUrl;
-    }
+      newPost.captionText = captionText;
+    } 
 
     // Push to subject
     subject.posts.unshift(newPost); // Add at beginning
@@ -361,6 +375,146 @@ const addQuestionPaper = async (req, res) => {
   }
 };
 
+const getAllSubjects =async (req, res) => {
+  try {
+    const facultyId = req.params.id;
+
+    const subjects = await Subject.find({
+      faculty: facultyId,
+      facultyRole: "Faculty"
+    }).select("subjectName subjectCode credits");
+
+    res.json(subjects);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch subjects" });
+  }
+};
+
+const getSubjectsBySessionYear = async (req, res) => {
+  const { session, year } = req.query;
+
+  try {
+    // Find all semesters that belong to this academic year (e.g., year 2)
+    const semesters = await Semester.find({ year: parseInt(year) });
+
+    const semesterIds = semesters.map(s => s._id);
+
+    // Fetch all subjects that match session and one of those semesters
+    const subjects = await Subject.find({
+      session,
+      semester: { $in: semesterIds },
+    });
+
+    res.status(200).json(subjects);
+  } catch (err) {
+    console.error("Error fetching subjects:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+const getSubjectsById= async (req, res) => {
+  try {
+    const academicYearId = req.params.id;
+    const subjects = await Subject.find({ academicYear: academicYearId });
+    res.status(200).json(subjects);
+  } catch (err) {
+    console.error("Error fetching subjects by academicYear ID:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getPostById =async (req, res) => {
+  try {
+    const subjectId = req.params.id;
+
+    const subject = await Subject.findById(subjectId)
+      .populate("posts.postedBy", "name email role") // populate user info
+      .lean();
+
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    // Reverse posts to show newest first (optional if already unshifted during creation)
+    const posts = subject.posts || [];
+    res.status(200).json({ posts: posts.reverse() });
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+  const studentInfo=  async (req, res) => {
+  try {
+    const subject = await Subject.findById(req.params.id)
+      .populate("students.student", "name roll")
+      .populate("posts.postedBy", "name role")
+      .lean();
+
+    if (!subject) return res.status(404).json({ message: "Subject not found" });
+
+    // Format the posts list
+    const posts = (subject.posts || []).map((p) => ({
+      _id: p._id,
+      captionText: p.captionText,
+      contentUrl: p.contentUrl,
+      type: p.type,
+      createdAt: p.createdAt,
+      role: p.postedBy?.role || "Faculty",
+    }));
+
+    res.json({
+      subjectId: subject._id,
+      subjectName: subject.name,
+      students: subject.students || [],
+      posts: posts.reverse(), // show latest first
+    });
+  } catch (err) {
+    console.error("Error fetching subject:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const enrollAllStudents= async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+
+    const subject = await Subject.findById(subjectId);
+    if (!subject) return res.status(404).json({ message: "Subject not found." });
+
+    // Find eligible students matching department and academic year
+    const eligibleStudents = await Student.find({
+      academicYear: subject.academicYear,
+      department: subject.department,
+    });
+
+    // Filter out already enrolled students
+    const alreadyEnrolledIds = subject.students.map(s => s.student.toString());
+
+    const newStudents = eligibleStudents.filter(
+      (stu) => !alreadyEnrolledIds.includes(stu._id.toString())
+    );
+
+    // Add new students to subject
+    newStudents.forEach((student) => {
+      subject.students.push({
+        student: student._id,
+        attendanceRecords: [],
+        totalPercentage: 0,
+      });
+    });
+
+    await subject.save();
+
+    return res.status(200).json({
+      message: `${newStudents.length} students enrolled.`,
+      enrolledCount: newStudents.length,
+    }); 
+  } catch (err) {
+    console.error("Enrollment Error:", err);
+    res.status(500).json({ message: "Failed to enroll students." });
+  }
+};
 
 
-module.exports={createSubject, markAttendance,markPresent,createPost,uploadSyllabus,addQuestionPaper};
+module.exports={enrollAllStudents,studentInfo,getPostById,getSubjectsById,createSubject, markAttendance,markPresent,createPost,uploadSyllabus,addQuestionPaper,getAllSubjects,getSubjectsBySessionYear};

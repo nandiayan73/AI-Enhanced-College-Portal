@@ -9,7 +9,6 @@ const academicYearSchema = new mongoose.Schema({
   session: {
     type: String,
     match: /^[0-9]{4}-[0-9]{2}$/, // e.g., 2021-22
-    unique: true,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

@@ -85,7 +85,6 @@ const subjectSchema = new mongoose.Schema({
     type: String,
     // required: true,
     match: /^[0-9]{4}-[0-9]{2}$/, // e.g., 2021-22
-    unique: true,
   },
 
   posts: [postSchema],

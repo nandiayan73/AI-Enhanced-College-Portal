@@ -2,7 +2,7 @@ const jwt=require("jsonwebtoken");
 const User =require("../models/BaseUser.model")
 require('dotenv').config();
 // const cookieSecret=process.env.COOKIE_SECRET;
-const jwtSecret=process.env.JWT_SECRET;
+const jwtSecret=process.env.JWT_SECRET || "secret_key";
 
 const Authenticate=async(req,res,next)=>{
     try{
@@ -10,8 +10,7 @@ const Authenticate=async(req,res,next)=>{
     const token=req.cookies.HareKrishna;
   
     const verifyToken=jwt.verify(token,jwtSecret);
-    const rootUser=await User.findOne({_id:verifyToken.id})
-    // console.log(rootUser)
+    const rootUser=await User.findOne({_id:verifyToken.userId})
     if(!rootUser){throw new Error("User not found!")};
     req.token=token;
     req.rootUser=rootUser;
