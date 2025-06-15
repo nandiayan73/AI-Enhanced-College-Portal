@@ -18,22 +18,22 @@ const getAcademicYearId=async(req,res)=>{
         return res.status(400).json({ academicYear});
 }
 
-
 const getStudentSubjects = async (req, res) => {
-  const {studentId}= req.body; // e.g., /student/subjects/:id
-
+  const { studentId } = req.body;
   try {
-    // Fetch the student with academic year
     const student = await Student.findById(studentId).populate("academicYear");
-
+    console.log(student);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
+    }
+
+    if (!student.academicYear) {
+      return res.status(400).json({ message: "Academic year not assigned for this student" });
     }
 
     const department = student.department;
     const academicYearId = student.academicYear._id;
 
-    // Find subjects the student is enrolled in
     const subjects = await Subject.find({
       department: department,
       academicYear: academicYearId,

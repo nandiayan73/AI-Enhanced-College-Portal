@@ -49,4 +49,44 @@ const predictQuestions = async (req, res) => {
   }
 };
 
-module.exports={predictQuestions};
+const getSubjectResources = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+
+    const subject = await Subject.findById(subjectId).select("syllabus questionPapers");
+
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found." });
+    }
+
+    res.status(200).json({
+      message: "Subject resources fetched successfully.",
+      syllabus: subject.syllabus,
+      questionPapers: subject.questionPapers
+    });
+  } catch (err) {
+    console.error("Error fetching subject resources:", err);
+    res.status(500).json({ message: "Server error while fetching subject resources." });
+  }
+};
+// DELETE /paper/deletequestionpaper
+const deleteQsPaper = async (req, res) => {
+  try {
+    const { subjectId, url } = req.query;
+
+    const subject = await Subject.findById(subjectId);
+    if (!subject) return res.status(404).json({ message: "Subject not found" });
+
+    subject.questionPapers = subject.questionPapers.filter(p => p.url !== url);
+    await subject.save();
+
+    res.json({ message: "Question paper deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+module.exports={predictQuestions,getSubjectResources,deleteQsPaper};

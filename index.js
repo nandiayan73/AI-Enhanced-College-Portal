@@ -15,7 +15,7 @@ const { createAcademicYear, getAcademicYearsBySession } = require("./Controllers
 const { createDepartment } = require("./Controllers/deparment.controllers");
 const { approveHOD, approveStudent, getPendingStudentsForHOD, getUnapprovedHODs } = require("./Controllers/approvalControllers");
 const { createSubject, markAttendance, createPost, uploadSyllabus, addQuestionPaper, getAllSubjects, getSubjectsBySessionYear, getSubjectsById, getPostById, studentInfo, markPresent, enrollAllStudents } = require("./Controllers/subject.controller");
-const { predictQuestions } = require("./Controllers/paper.controller");
+const { predictQuestions, getSubjectResources, deleteQsPaper } = require("./Controllers/paper.controller");
 const Authenticate = require("./Middlewares/auth");
 const { facultyUpdatePhoto, principalUpdatePhoto, HODUpdatePhoto } = require("./Controllers/update.controllers");
 const { publishNotice, getAllNotices, getNotices } = require("./Controllers/notice.controllers");
@@ -58,7 +58,7 @@ app.post("/user/approvestudent",approveStudent);
 app.post("/user/getpendingstudents",getPendingStudentsForHOD);
 
 // created subject by HODs:
-app.post("/subjects/createsubjects",createSubject);
+app.post("/subjects/createsubjects",Authenticate,createSubject);
 app.post("/subjects/markattendance",markAttendance);
 app.post("/subjects/markpresent",markPresent);
 app.post("/subjects/post",Authenticate,createPost);
@@ -89,6 +89,9 @@ app.get("/subject/getbysessionyear",getSubjectsBySessionYear);
 app.get("/allacademyyear",getAcademicYearsBySession);
 app.get("/subjects/by-academicyear/:id",getSubjectsById);
 app.post("/subjects/createpost",createPost);
+app.get("/subjects/:subjectId/resources", getSubjectResources);
+
+app.delete("/paper/deletequestionpaper",deleteQsPaper);
 
 
 app.get("/subjects/:id",studentInfo);

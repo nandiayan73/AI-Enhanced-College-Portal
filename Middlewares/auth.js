@@ -8,7 +8,6 @@ const Authenticate=async(req,res,next)=>{
     try{
     // console.log(req.cookies.HareKrishna);
     const token=req.cookies.HareKrishna;
-  
     const verifyToken=jwt.verify(token,jwtSecret);
     const rootUser=await User.findOne({_id:verifyToken.userId})
     if(!rootUser){throw new Error("User not found!")};

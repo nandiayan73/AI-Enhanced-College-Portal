@@ -16,11 +16,8 @@ const createSubject = async (req, res) => {
       facultyRole
     } = req.body;
 
-    // const hod = req.rootUser;
-    const hod=
-    {
-      department:"CSE"
-    }
+    const hod = req.rootUser;
+    console.log("This:"+hod);
 
     console.log("Hod Department:\t"+hod.department);
     if(hod.department!=department)
@@ -77,7 +74,7 @@ const createSubject = async (req, res) => {
 
   } catch (err) {
     console.error("Subject Create Error:", err);
-    res.status(500).json({ message: "Server Error" });
+    return res.status(500).json({ message: "Server Error" });
   }
 };
 const markAttendance = async (req, res) => {
