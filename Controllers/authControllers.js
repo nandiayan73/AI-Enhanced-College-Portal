@@ -22,7 +22,6 @@ const registerUser = async (req, res) => {
       session,
       year, // Year of study (1–4)
       designation,
-      HODStream
     } = req.body;
 
     // 1. Validate base fields
@@ -142,7 +141,7 @@ const loginUser = async (req, res) => {
     }
 
     // 3. Check approval status
-    if (user.role === "Student" || user.role === "HOD") {
+    if (user.__t === "Student" || user.__t === "HOD") {
       if (!user.isApproved) {
         return res.status(403).json({ message: `Your ${user.role} account is not yet approved.` });
       }
@@ -226,4 +225,17 @@ const logout = (req, res) => {
       });
     }
   };
-module.exports={registerUser,loginUser,isLogged,logout};
+  const deleteUserById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deleted = await BaseUser.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ error: "User not found" });
+
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Delete error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+module.exports={registerUser,loginUser,isLogged,logout,deleteUserById};

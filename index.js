@@ -10,19 +10,30 @@ require('dotenv').config();
 const port = process.env.PORT;
 
 // importing the files:
-const {registerUser, loginUser, isLogged, logout} =require("./Controllers/authControllers");
+const {registerUser, loginUser, isLogged, logout, deleteUserById} =require("./Controllers/authControllers");
 const { createAcademicYear, getAcademicYearsBySession } = require("./Controllers/academicyear.controller");
 const { createDepartment } = require("./Controllers/deparment.controllers");
 const { approveHOD, approveStudent, getPendingStudentsForHOD, getUnapprovedHODs } = require("./Controllers/approvalControllers");
 const { createSubject, markAttendance, createPost, uploadSyllabus, addQuestionPaper, getAllSubjects, getSubjectsBySessionYear, getSubjectsById, getPostById, studentInfo, markPresent, enrollAllStudents } = require("./Controllers/subject.controller");
 const { predictQuestions, getSubjectResources, deleteQsPaper } = require("./Controllers/paper.controller");
 const Authenticate = require("./Middlewares/auth");
-const { facultyUpdatePhoto, principalUpdatePhoto, HODUpdatePhoto } = require("./Controllers/update.controllers");
+const { facultyUpdatePhoto, principalUpdatePhoto, HODUpdatePhoto, StudentUpdatePhoto, getUsersByType, getCurrentSession, updateSession } = require("./Controllers/update.controllers");
 const { publishNotice, getAllNotices, getNotices } = require("./Controllers/notice.controllers");
-const { getStudentSubjects } = require("./Controllers/student.controller");
+const { getStudentSubjects, notifyLowAttendent, getStudentNotices } = require("./Controllers/student.controller");
+const { charBot, updateBotHistory } = require("./Controllers/bot.controller");
+const College = require("./models/college.model");
 
 // Setting the database:
 db();
+// Make singleton class object:
+(async () => {
+  try {
+    const singletonCollege = await College.getSingleton();
+    console.log("✅ College Singleton Loaded:", singletonCollege);
+  } catch (error) {
+    console.error("❌ Failed to load College singleton:", error);
+  }
+})();
 
 
 // for parsing the cookies and data:
@@ -38,6 +49,10 @@ app.use(cors({
 
 
 // API REQUESTS:
+
+// Make the session for the academic year:
+app.get("/college/session", getCurrentSession);
+app.post("/college/updatesession", updateSession);
 // register user:
 app.post("/user/register",registerUser);
 
@@ -79,6 +94,7 @@ app.get("/subjects/by-faculty/:id",getAllSubjects);
 app.post("/faculty/updatephoto",facultyUpdatePhoto);
 app.post("/principal/update-photo",principalUpdatePhoto);
 app.post("/hod/update-photo",HODUpdatePhoto);
+app.post("/student/update-photo",StudentUpdatePhoto);
 
 // Notice:
 app.post("/principal/uploadnotice",publishNotice);
@@ -92,11 +108,22 @@ app.post("/subjects/createpost",createPost);
 app.get("/subjects/:subjectId/resources", getSubjectResources);
 
 app.delete("/paper/deletequestionpaper",deleteQsPaper);
+app.post("/principal/notify-low-attendance",notifyLowAttendent);
+app.post("/student/getnotices",getStudentNotices);
 
 
 app.get("/subjects/:id",studentInfo);
 // Student details:
 app.post("/student/allsubjects",getStudentSubjects);
+
+// Chatbot:
+app.post("/api/chatbot/chat",charBot);
+app.post("/api/chatbot/update-history",updateBotHistory);
+
+// manage users
+app.get("/user/:type",getUsersByType);
+app.delete("/user/delete/:id",deleteUserById);
+
 app.listen(3000,(req,res)=>{
     console.log("Server is set at port number\t"+port);
 })

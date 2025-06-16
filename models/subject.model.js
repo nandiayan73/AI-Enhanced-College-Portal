@@ -61,7 +61,8 @@ const subjectSchema = new mongoose.Schema({
   department: { type: String, required: true },
   semester: { type: mongoose.Schema.Types.ObjectId, ref: "Semester" },
 
-  academicYear: {
+  academicYear: 
+  {
     type: mongoose.Schema.Types.ObjectId,
     ref: "AcademicYear",
     required: true,

@@ -51,4 +51,58 @@ const getStudentSubjects = async (req, res) => {
   }
 };
 
-module.exports = { getStudentSubjects };
+const notifyLowAttendent= async (req, res) => {
+  try {
+    const subjects = await Subject.find().populate("students.student");
+
+    const noticeText = "⚠️ Your attendance is below 75%. Please meet your faculty advisor.";
+
+    for (const subject of subjects) {
+      for (const studentRecord of subject.students) {
+        const { student, totalPercentage } = studentRecord;
+
+        if (totalPercentage < 75 && student) {
+          await Student.findByIdAndUpdate(student._id, {
+            $push: {
+              notices: {
+                text: noticeText,
+                date: new Date().toISOString(),
+                subject:subject.subjectName
+              },
+            },
+          });
+        }
+      }
+    }
+
+    res.status(200).json({ message: "Notices sent to students with attendance below 75%" });
+  } catch (err) {
+    console.error("Error notifying students:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+  
+  const getStudentNotices=async (req, res) => {
+  try {
+    const { studentId } = req.body;
+    const id=studentId;
+
+    if (!id) {
+      return res.status(400).json({ message: "Student ID is required" });
+    }
+
+    const student = await Student.findById(id).select("notices");
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.status(200).json({ notices: student.notices });
+  } catch (err) {
+    console.error("Error fetching notices:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+module.exports = { getStudentSubjects ,notifyLowAttendent,getStudentNotices};
